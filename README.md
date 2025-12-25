@@ -10,7 +10,8 @@ Notebooks of iFLYTEK&amp;GZIST AI Industry-Academia Collaborative College
 
 - [Li Jungeng](LiJungeng/game_wuziqi.html)
 - Qiu Zhuo
-- Chen Hansen
+- [Chen Hansen](ChenHansen/game_snake.html)
+- 
 - Zhang Runtian
 - WenRuiWen
 - Lin Zemin
