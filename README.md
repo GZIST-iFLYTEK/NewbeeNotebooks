@@ -8,12 +8,13 @@ Notebooks of iFLYTEK&amp;GZIST AI Industry-Academia Collaborative College
 
 ## Members
 
-- [Li Jungeng](https://www.baidu.com)
+- [Li Jungeng](LiJungeng/game_wuziqi.html)
 - Qiu Zhuo
-- Chen Hansen
+- [Chen Hansen](ChenHansen/game_snake.html)
+- 
 - Zhang Runtian
 - WenRuiWen
-- Lin Zemin
+- [Lin Zemin](https://www.bilibili.com/)
 - Zhong Jiayi
 - Shi Tanqi
 - Ye Zifeng

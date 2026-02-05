@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋 - 人机对战</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .game-container {
+            display: inline-block;
+            background-color: #e1b868;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        #chessboard {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 1px;
+            background-color: #d1a858;
+        }
+        .chess-cell {
+            width: 30px;
+            height: 30px;
+            background-color: transparent;
+            cursor: pointer;
+            position: relative;
+        }
+        .chess-cell::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background-color: #333;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .chess-black, .chess-white {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .chess-black {
+            background-color: #000;
+        }
+        .chess-white {
+            background-color: #fff;
+            border: 1px solid #ccc;
+        }
+        .info {
+            margin-top: 15px;
+            font-size: 18px;
+            color: #333;
+        }
+        #reset-btn {
+            margin-top: 10px;
+            padding: 8px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #reset-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>五子棋 - 超强人机对战</h1>
+    <div class="game-container">
+        <div id="chessboard"></div>
+        <div class="info">当前回合：<span id="turn">玩家（黑棋）</span></div>
+        <button id="reset-btn">重新开始</button>
+    </div>
+
+    <script>
+        // 初始化棋盘（15x15）
+        const chessboard = document.getElementById('chessboard');
+        const turnText = document.getElementById('turn');
+        const resetBtn = document.getElementById('reset-btn');
+        const size = 15; // 棋盘尺寸
+        let boardData = Array(size).fill().map(() => Array(size).fill(0)); // 0:空 1:玩家(黑) 2:AI(白)
+        let currentPlayer = 1; // 1:玩家 2:AI
+        let gameOver = false;
+
+        // 评分权重（核心：不同棋型的优先级）
+        const SCORE = {
+            WIN: 100000,    // 活4/冲4能赢
+            LIVE3: 1000,    // 活3（两边空，能发展成活4）
+            JUMP3: 500,     // 跳3（中间空，比如 1 空 1 1）
+            LIVE2: 100,     // 活2
+            BLOCK3: 50,     // 堵3
+            BLOCK2: 10,     // 堵2
+            DEFAULT: 1      // 普通落子
+        };
+
+        // 创建棋盘格子
+        function createChessboard() {
+            chessboard.innerHTML = '';
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'chess-cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    cell.addEventListener('click', handleCellClick);
+                    chessboard.appendChild(cell);
+                }
+            }
+        }
+
+        // 玩家点击落子
+        function handleCellClick(e) {
+            if (gameOver || currentPlayer !== 1) return; // 游戏结束/非玩家回合，不响应
+            const x = parseInt(e.target.dataset.x);
+            const y = parseInt(e.target.dataset.y);
+            if (boardData[y][x] !== 0) return; // 已有棋子，不能落子
+
+            // 玩家落子（黑棋）
+            placeChess(x, y, 1);
+
+            // 判断玩家是否获胜
+            if (checkWin(x, y)) {
+                gameOver = true;
+                alert('恭喜你！你赢了！');
+                turnText.textContent = '游戏结束';
+                return;
+            }
+
+            // 切换到AI回合
+            currentPlayer = 2;
+            turnText.textContent = 'AI（白棋）';
+
+            // AI延迟落子（模拟思考）
+            setTimeout(aiMove, 600);
+        }
+
+        // 加强版AI落子逻辑（评分机制）
+        function aiMove() {
+            if (gameOver) return;
+
+            let bestScore = -Infinity;
+            let bestX = -1, bestY = -1;
+
+            // 遍历所有空位，计算每个位置的得分
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (boardData[y][x] === 0) {
+                        // 计算AI落子此处的得分（进攻）
+                        boardData[y][x] = 2;
+                        const aiScore = calculateScore(x, y, 2);
+                        // 计算玩家落子此处的得分（防守）
+                        boardData[y][x] = 1;
+                        const playerScore = calculateScore(x, y, 1);
+                        // 还原空位
+                        boardData[y][x] = 0;
+
+                        // 总得分 = 进攻得分 + 防守得分（优先防守致命点）
+                        const totalScore = aiScore + playerScore;
+
+                        // 记录最高分的位置
+                        if (totalScore > bestScore) {
+                            bestScore = totalScore;
+                            bestX = x;
+                            bestY = y;
+                        }
+                    }
+                }
+            }
+
+            // AI落子（白棋）
+            placeChess(bestX, bestY, 2);
+
+            // 判断AI是否获胜
+            if (checkWin(bestX, bestY)) {
+                gameOver = true;
+                alert('AI赢了！再来一局吧～');
+                turnText.textContent = '游戏结束';
+                return;
+            }
+
+            // 切换回玩家回合
+            currentPlayer = 1;
+            turnText.textContent = '玩家（黑棋）';
+        }
+
+        // 计算某个位置的得分（核心：判断棋型）
+        function calculateScore(x, y, player) {
+            let score = 0;
+            const directions = [[1,0], [0,1], [1,1], [1,-1]]; // 横、竖、左斜、右斜
+
+            for (let [dx, dy] of directions) {
+                // 获取当前方向的棋子序列（左右各延伸4格）
+                const line = getLine(x, y, dx, dy, player);
+                // 分析棋型并打分
+                score += evaluateLine(line, player);
+                // 如果有能赢的棋型，直接返回最高分
+                if (score >= SCORE.WIN) break;
+            }
+
+            return score;
+        }
+
+        // 获取某个方向的棋子序列（用于分析棋型）
+        function getLine(x, y, dx, dy, player) {
+            let line = [];
+            // 向左/上延伸4格
+            for (let i = 4; i >= 1; i--) {
+                const nx = x - dx * i;
+                const ny = y - dy * i;
+                if (nx < 0 || nx >= size || ny < 0 || ny >= size) break;
+                line.push(boardData[ny][nx]);
+            }
+            // 当前位置
+            line.push(player);
+            // 向右/下延伸4格
+            for (let i = 1; i <= 4; i++) {
+                const nx = x + dx * i;
+                const ny = y + dy * i;
+                if (nx < 0 || nx >= size || ny < 0 || ny >= size) break;
+                line.push(boardData[ny][nx]);
+            }
+            return line;
+        }
+
+        // 分析棋型并打分（核心逻辑）
+        function evaluateLine(line, player) {
+            let score = 0;
+            const opponent = player === 1 ? 2 : 1;
+
+            // 遍历所有连续5格的子序列（判断五子连珠相关棋型）
+            for (let i = 0; i <= line.length - 5; i++) {
+                const window = line.slice(i, i + 5);
+                const count = window.filter(c => c === player).length;
+                const empty = window.filter(c => c === 0).length;
+                const oppCount = window.filter(c => c === opponent).length;
+
+                // 活4（4个同色+1个空，能直接赢）
+                if (count === 4 && empty === 1) {
+                    score += SCORE.WIN;
+                }
+                // 冲4（4个同色+1个对手，需要堵）
+                else if (count === 4 && oppCount === 1) {
+                    score += SCORE.WIN / 2;
+                }
+                // 活3（3个同色+2个空，能发展成活4）
+                else if (count === 3 && empty === 2) {
+                    score += SCORE.LIVE3;
+                }
+                // 跳3（比如 1 0 1 1 0，中间空一个的3）
+                else if (count === 3 && empty === 1 && oppCount === 1) {
+                    score += SCORE.JUMP3;
+                }
+                // 活2（2个同色+3个空）
+                else if (count === 2 && empty === 3) {
+                    score += SCORE.LIVE2;
+                }
+                // 防守：堵玩家的活3
+                else if (count === 0 && window.filter(c => c === opponent).length === 3 && empty === 2) {
+                    score += SCORE.BLOCK3;
+                }
+                // 防守：堵玩家的活2
+                else if (count === 0 && window.filter(c => c === opponent).length === 2 && empty === 3) {
+                    score += SCORE.BLOCK2;
+                }
+                // 普通落子（优先中心）
+                else {
+                    score += SCORE.DEFAULT;
+                }
+            }
+
+            return score;
+        }
+
+        // 落子渲染
+        function placeChess(x, y, player) {
+            // 记录棋子数据
+            boardData[y][x] = player;
+            // 找到对应格子并添加棋子
+            const cell = chessboard.children[y * size + x];
+            const chess = document.createElement('div');
+            chess.className = player === 1 ? 'chess-black' : 'chess-white';
+            cell.appendChild(chess);
+        }
+
+        // 检查胜负（横、竖、斜4个方向）
+        function checkWin(x, y) {
+            const player = boardData[y][x];
+            // 方向：[dx, dy] 横、竖、左斜、右斜
+            const directions = [[1,0], [0,1], [1,1], [1,-1]];
+
+            for (let [dx, dy] of directions) {
+                let count = 1; // 当前棋子本身
+                // 正向遍历
+                for (let i = 1; i < 5; i++) {
+                    const nx = x + dx * i;
+                    const ny = y + dy * i;
+                    if (nx >=0 && nx < size && ny >=0 && ny < size && boardData[ny][nx] === player) {
+                        count++;
+                    } else break;
+                }
+                // 反向遍历
+                for (let i = 1; i < 5; i++) {
+                    const nx = x - dx * i;
+                    const ny = y - dy * i;
+                    if (nx >=0 && nx < size && ny >=0 && ny < size && boardData[ny][nx] === player) {
+                        count++;
+                    } else break;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // 重置游戏
+        function resetGame() {
+            boardData = Array(size).fill().map(() => Array(size).fill(0));
+            currentPlayer = 1;
+            gameOver = false;
+            turnText.textContent = '玩家（黑棋）';
+            createChessboard();
+        }
+
+        // 初始化
+        createChessboard();
+        resetBtn.addEventListener('click', resetGame);
+    </script>
+</body>
+</html>
